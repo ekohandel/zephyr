@@ -1,0 +1,18 @@
+config USBIP
+	bool
+
+config USBIP_SERVER
+	bool "USB/IP Server"
+	default y
+	depends on UDC_NATIVE_POSIX
+	select USBIP
+
+config USBIP_SERVER_MAX_CONNECTIONS
+	int "Maximum simultaneous USB/IP Server connections"
+	default 8
+	depends on USBIP_SERVER
+
+config USBIP_SERVER_PORT
+	int "USB/IP Server listening port"
+	default 3240
+	depends on USBIP_SERVER

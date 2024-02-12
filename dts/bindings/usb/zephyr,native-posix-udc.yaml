@@ -5,4 +5,4 @@ description: Native POSIX USB device controller
 
 compatible: "zephyr,native-posix-udc"
 
-include: usb-controller.yaml
+include: [usb-controller.yaml, usb-ep.yaml]

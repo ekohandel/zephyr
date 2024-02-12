@@ -1,0 +1,28 @@
+# Copyright (c) 2023 Nordic Semiconductor ASA
+# SPDX-License-Identifier: Apache-2.0
+
+config UDC_NATIVE_POSIX
+	bool "Native POSIX USB device controller driver"
+	default y
+	depends on DT_HAS_ZEPHYR_NATIVE_POSIX_UDC_ENABLED
+	help
+	  Native POSIX USB device controller driver.
+
+config UDC_NATIVE_POSIX_STACK_SIZE
+	int "UDC native POSIX driver internal thread stack size"
+	depends on UDC_NATIVE_POSIX
+	default 512
+	help
+	  Native POSIX driver internal thread stack size.
+
+config UDC_NATIVE_POSIX_THREAD_PRIORITY
+	int "UDC native POSIX driver thread priority"
+	depends on UDC_NATIVE_POSIX
+	default 8
+	help
+	  Native POSIX driver thread priority.
+
+config UDC_POSX_NATIVE_MAX_QMESSAGES
+	int
+	depends on UDC_NATIVE_POSIX
+	default 8

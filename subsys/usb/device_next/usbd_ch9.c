@@ -136,11 +136,13 @@ static int sreq_set_configuration(struct usbd_contex *const uds_ctx)
 		errno = -ENOTSUP;
 		return 0;
 	}
-
+/*
+ *  // TODO: usbip doesn't set address to we are stuck in default state and can't configure
 	if (usbd_state_is_default(uds_ctx)) {
 		errno = -EPERM;
 		return 0;
 	}
+*/
 
 	if (setup->wValue && !usbd_config_exist(uds_ctx, setup->wValue)) {
 		errno = -EPERM;
