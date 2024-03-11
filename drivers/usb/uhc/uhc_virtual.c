@@ -280,7 +280,7 @@ static int vrt_handle_reply(const struct device *dev,
 	int ret = 0;
 
 	if (xfer == NULL) {
-		LOG_ERR("No transfers to handle");
+		//LOG_ERR("No transfers to handle");
 		ret = -ENODATA;
 		goto handle_reply_err;
 	}
@@ -338,7 +338,7 @@ static void xfer_work_handler(struct k_work *work)
 				} else {
 					vrt_xfer_drop_active(dev, -ETIMEDOUT);
 					priv->busy = false;
-					LOG_WRN("Transfer timeout");
+					//LOG_WRN("Transfer timeout");
 				}
 			}
 			break;
@@ -354,6 +354,8 @@ static void xfer_work_handler(struct k_work *work)
 		}
 
 		k_mem_slab_free(&uhc_vrt_slab, (void *)ev);
+
+		k_busy_wait(100);
 	}
 }
 

@@ -98,7 +98,8 @@ struct uhc_transfer *uhc_xfer_alloc(const struct device *dev,
 				    const uint16_t mps,
 				    const uint16_t timeout,
 				    void *const udev,
-				    void *const cb)
+				    void *const cb,
+					void *const cb_data)
 {
 	const struct uhc_api *api = dev->api;
 	struct uhc_transfer *xfer = NULL;
@@ -125,6 +126,7 @@ struct uhc_transfer *uhc_xfer_alloc(const struct device *dev,
 	xfer->timeout = timeout;
 	xfer->udev = udev;
 	xfer->cb = cb;
+	xfer->cb_data = cb_data;
 
 xfer_alloc_error:
 	api->unlock(dev);
@@ -150,7 +152,7 @@ struct uhc_transfer *uhc_xfer_alloc_with_buf(const struct device *dev,
 		return NULL;
 	}
 
-	xfer = uhc_xfer_alloc(dev, addr, ep, attrib, mps, timeout, udev, cb);
+	xfer = uhc_xfer_alloc(dev, addr, ep, attrib, mps, timeout, udev, cb, NULL);
 	if (xfer == NULL) {
 		net_buf_unref(buf);
 		return NULL;

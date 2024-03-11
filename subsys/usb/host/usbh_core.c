@@ -52,7 +52,7 @@ static ALWAYS_INLINE int usbh_event_handler(struct usbh_contex *const ctx,
 		usbh_udev_cb_t cb = event->xfer->cb;
 
 		if (event->xfer->cb) {
-			ret = cb(udev, event->xfer);
+			ret = cb(udev, event->xfer, event->xfer->cb_data);
 		} else {
 			ret = discard_ep_request(ctx, event->xfer);
 		}

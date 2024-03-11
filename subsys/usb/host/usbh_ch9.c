@@ -26,7 +26,7 @@ LOG_MODULE_REGISTER(usbh_ch9, CONFIG_USBH_LOG_LEVEL);
 
 K_SEM_DEFINE(ch9_req_sync, 0, 1);
 
-static int ch9_req_cb(struct usb_device *const udev, struct uhc_transfer *const xfer)
+static int ch9_req_cb(struct usb_device *const udev, struct uhc_transfer *const xfer, void *const data)
 {
 	LOG_DBG("Request finished %p, err %d", xfer, xfer->err);
 	k_sem_give(&ch9_req_sync);
@@ -53,7 +53,7 @@ int usbh_req_setup(struct usb_device *const udev,
 	uint8_t ep = usb_reqtype_is_to_device(&req) ? 0x00 : 0x80;
 	int ret;
 
-	xfer = usbh_xfer_alloc(udev, ep, 0, 64, SETUP_REQ_TIMEOUT, (void *)ch9_req_cb);
+	xfer = usbh_xfer_alloc(udev, ep, 0, 64, SETUP_REQ_TIMEOUT, (void *)ch9_req_cb, NULL);
 	if (!xfer) {
 		return -ENOMEM;
 	}

@@ -1,0 +1,44 @@
+# Copyright (c) 2022 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: Apache-2.0
+
+config USBH_USBIP
+	bool "USB/IP host"
+    depends on USB_HOST_STACK
+    depends on DT_HAS_ZEPHYR_USBIP_HOST_ENABLED
+	help
+		USB/IP host stack support
+
+config USBH_USBIP_MAX_URB_SIZE
+	int
+	depends on USBH_USBIP
+	default 512
+	help
+		Maximum size of a single URB 
+
+
+config USBH_USBIP_URB_COUNT
+	int
+	depends on USBH_USBIP
+	default	64
+	help
+		Maximum number of outstanding URBs
+
+config USBH_USBIP_MAX_DEVICE_COUNT
+	int
+	depends on USBH_USBIP
+	default	8
+	help
+		Maximum number of USB/IP devices
+
+config USBH_USBIP_SERVER_PORT
+	int
+	default 3240
+
+config USBH_USBIP_SERVER_THREAD_PRIO
+	int
+	default 2
+
+config USBH_USBIP_SERVER_MAX_CONNECTIONS
+	int
+	default 2

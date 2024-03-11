@@ -69,6 +69,7 @@ struct uhc_transfer {
 	void *udev;
 	/** Pointer to transfer completion callback (opaque for the UHC) */
 	void *cb;
+	void *cb_data;
 	/** Transfer result, 0 on success, other values on error */
 	int err;
 };
@@ -351,7 +352,7 @@ struct uhc_transfer *uhc_xfer_alloc(const struct device *dev,
 				    const uint16_t mps,
 				    const uint16_t timeout,
 				    void *const udev,
-				    void *const cb);
+				    void *const cb, void *const cb_data);
 
 /**
  * @brief Allocate UHC transfer with buffer

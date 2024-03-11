@@ -26,11 +26,12 @@ struct usb_device {
 	enum usb_device_state state;
 	uint8_t actual_cfg;
 	uint8_t addr;
+	void *owner;
 };
 
 /* Callback type to be used for e.g. synchronous requests */
 typedef int (*usbh_udev_cb_t)(struct usb_device *const udev,
-			      struct uhc_transfer *const xfer);
+			      struct uhc_transfer *const xfer, void *data);
 
 /*
  * Get a device to work on, there will only be one for the first time
@@ -44,11 +45,12 @@ static inline struct uhc_transfer *usbh_xfer_alloc(struct usb_device *udev,
 						   const uint8_t attrib,
 						   const uint16_t mps,
 						   const uint16_t timeout,
-						   usbh_udev_cb_t *const cb)
+						   usbh_udev_cb_t *const cb,
+						   void *cb_data)
 {
 	struct usbh_contex *const ctx = udev->ctx;
 
-	return uhc_xfer_alloc(ctx->dev, udev->addr, ep, attrib, mps, timeout, udev, cb);
+	return uhc_xfer_alloc(ctx->dev, udev->addr, ep, attrib, mps, timeout, udev, cb, cb_data);
 }
 
 static inline int usbh_xfer_buf_add(const struct usb_device *udev,
