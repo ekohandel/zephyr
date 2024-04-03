@@ -20,7 +20,7 @@ config USBH_USBIP_MAX_URB_SIZE
 config USBH_USBIP_URB_COUNT
 	int
 	depends on USBH_USBIP
-	default	64
+	default	8
 	help
 		Maximum number of outstanding URBs
 

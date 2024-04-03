@@ -61,7 +61,7 @@ LISTIFY(CONFIG_USBH_USBIP_SERVER_MAX_CONNECTIONS, USBIP_CONN_BUF_POOL, (;));
 	}
 
 static K_THREAD_STACK_ARRAY_DEFINE(usbip_conn_stacks, CONFIG_USBH_USBIP_SERVER_MAX_CONNECTIONS,
-				   CONFIG_ARCH_POSIX_RECOMMENDED_STACK_SIZE);
+				   4096);
 static struct usbip_conn usbip_conn[] = {
 	LISTIFY(CONFIG_USBH_USBIP_SERVER_MAX_CONNECTIONS, USBIP_CONN, (, ))};
 
@@ -286,7 +286,7 @@ static int usbip_srv_conn(int fd)
 
 		conn->started = true;
 		k_thread_create(&conn->thread, conn->stack,
-				CONFIG_ARCH_POSIX_RECOMMENDED_STACK_SIZE, usbip_srv_conn_handler,
+				4096, usbip_srv_conn_handler,
 				(void *)(uintptr_t)fd, conn->buf_pool, NULL,
 				K_PRIO_COOP(CONFIG_USBH_USBIP_SERVER_THREAD_PRIO), 0, K_NO_WAIT);
 
@@ -471,5 +471,5 @@ int usbip_tx(int fd, const void *buf, size_t len)
 	return 0;
 }
 
-K_THREAD_DEFINE(usbip_srv, CONFIG_ARCH_POSIX_RECOMMENDED_STACK_SIZE, usbip_srv_thread, NULL, NULL,
+K_THREAD_DEFINE(usbip_srv, 4096, usbip_srv_thread, NULL, NULL,
 		NULL, K_PRIO_COOP(CONFIG_USBH_USBIP_SERVER_THREAD_PRIO), 0, 0);

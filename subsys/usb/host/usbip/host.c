@@ -24,6 +24,7 @@ struct usbip_host_data {
 	struct usb_device udev;
 	struct k_thread urb_thread;
 	struct k_thread rx_thread;
+	struct k_mutex mutex;
 	int fd;
 };
 
@@ -76,11 +77,13 @@ static int usbip_host_urb_alloc(const struct device *dev, const struct usbip_cmd
 	struct usbip_host_urb *u;
 	uint32_t direction;
 
-	rc = k_mem_slab_alloc(config->urb_slab, (void **)urb, K_NO_WAIT);
+	rc = k_mem_slab_alloc(config->urb_slab, (void **)urb, K_FOREVER);
 	if (rc) {
 		LOG_ERR("Could not allocate urb.");
 		return -ENOMEM;
 	}
+
+	memset(*urb, 0, sizeof(struct usbip_host_urb));
 
 	direction = ntohl(cmd->hdr.direction);
 	u = *urb;
@@ -98,14 +101,17 @@ static int usbip_host_urb_alloc(const struct device *dev, const struct usbip_cmd
 static int usbip_host_urb_free(const struct device *dev, struct usbip_host_urb *urb)
 {
 	const struct usbip_host_config *config = dev->config;
+	struct usbip_host_data *priv = dev->data;
 
 	if (urb->xfer) {
 		net_buf_unref(urb->xfer);
 	}
 
+	k_mutex_lock(&priv->mutex, K_FOREVER);
 	if (sys_dnode_is_linked(&urb->_node)) {
 		sys_dlist_remove(&urb->_node);
 	}
+	k_mutex_unlock(&priv->mutex);
 
 	k_mem_slab_free(config->urb_slab, urb);
 
@@ -216,21 +222,35 @@ static int usbip_host_urb_data_submit(const struct device *dev, struct usbip_hos
 			(void *)usbip_host_urb_data_submit_cb, urb);
 
 	if (xfer == NULL) {
+		LOG_ERR("Could not allocate transfer");
 		return -ENOMEM;
 	}
 
 	if (urb->xfer) {
 		ret = usbh_xfer_buf_add(&priv->udev, xfer, urb->xfer);
 		if (ret) {
+			LOG_ERR("Could not add buffer");
 			return ret;
 		}
 	}
 
-	return usbh_xfer_enqueue(&priv->udev, xfer);
+	ret = usbh_xfer_enqueue(&priv->udev, xfer);
+	if (ret) {
+		LOG_ERR("Could not enqueue transfer");
+	}
+
+	return ret;
 }
 
 static int usbip_host_urb_submit(const struct device *dev, struct usbip_host_urb *urb)
 {
+	struct usbip_host_data *priv = dev->data;
+	const struct usbip_host_config *config = dev->config;
+
+	k_mutex_lock(&priv->mutex, K_FOREVER);
+	sys_dlist_append(config->urb_list, &urb->_node);
+	k_mutex_unlock(&priv->mutex);
+
 	if (USB_EP_GET_IDX(urb->ep) == 0) {
 		return usbip_host_urb_ctrl_submit(dev, urb);
 	}
@@ -241,9 +261,11 @@ static int usbip_host_urb_unlink(const struct device *dev, struct usbip_host_urb
 {
 	struct usbip_host_urb *u, *s;
 	const struct usbip_host_config *config = dev->config;
+	struct usbip_host_data *priv = dev->data;
 
 	urb->status = 0;
 
+	k_mutex_lock(&priv->mutex, K_FOREVER);
 	SYS_DLIST_FOR_EACH_CONTAINER_SAFE(config->urb_list, u, s, _node) {
 		if (u->seqnum != urb->unlink_seqnum) {
 			continue;
@@ -254,6 +276,7 @@ static int usbip_host_urb_unlink(const struct device *dev, struct usbip_host_urb
 			usbip_host_urb_free(dev, u);
 		}
 	}
+	k_mutex_unlock(&priv->mutex);
 
 	return usbip_host_tx_unlink(dev, urb);
 }
@@ -311,7 +334,7 @@ static int usbip_host_rx_submit(const struct device *dev, const struct usbip_cmd
 	urb->interval = ntohl(cmd->submit.interval);
 	urb->transfer_buffer_length = len;
 	if (len) {
-		urb->xfer = net_buf_alloc(config->xfr_pool, K_NO_WAIT);
+		urb->xfer = net_buf_alloc(config->xfr_pool, K_FOREVER);
 		if (urb->xfer == NULL) {
 			LOG_ERR("Could not allocate xfr buffer.");
 			goto exit;
@@ -320,6 +343,7 @@ static int usbip_host_rx_submit(const struct device *dev, const struct usbip_cmd
 
 	if (USB_EP_GET_DIR(urb->ep) == USB_EP_DIR_OUT && len) {
 		/* copy xfer */
+		LOG_ERR("Doing xfer");
 		rc = usbip_rx(priv->fd, net_buf_add(urb->xfer, len), len);
 		if (rc) {
 			goto exit;
@@ -332,7 +356,7 @@ static int usbip_host_rx_submit(const struct device *dev, const struct usbip_cmd
 		.urb = urb,
 	};
 
-	rc = k_msgq_put(config->msgq, &evt, K_NO_WAIT);
+	rc = k_msgq_put(config->msgq, &evt, K_FOREVER);
 	if (rc) {
 		LOG_ERR("Could not put message");
 		goto exit;
@@ -364,7 +388,7 @@ static int usbip_host_rx_unlink(const struct device *dev, const struct usbip_cmd
 		.urb = urb,
 	};
 
-	rc = k_msgq_put(config->msgq, &evt, K_NO_WAIT);
+	rc = k_msgq_put(config->msgq, &evt, K_FOREVER);
 	if (rc) {
 		LOG_ERR("Could not put message");
 		goto exit;
@@ -383,6 +407,8 @@ static int usbip_host_pre_init(const struct device *dev)
 
 	priv->fd = -1;
 	priv->udev.owner = (void *)dev;
+
+	k_mutex_init(&priv->mutex);
 
 	STRUCT_SECTION_FOREACH(usbh_contex, uhs_ctx) {
 		if (uhs_ctx->dev == config->usbh) {
@@ -416,7 +442,7 @@ static void usbip_host_rx_handler(const struct device *dev)
 			ret = usbip_host_rx_submit(dev, &cmd);
 			break;
 		case USBIP_CMD_UNLINK:
-			ret = usbip_host_rx_unlink(dev, &cmd);
+			//ret = usbip_host_rx_unlink(dev, &cmd);
 			break;
 		default:
 			LOG_ERR("Unknown command 0x%x", command);
@@ -516,13 +542,13 @@ static struct usbip_api usbip_host_api = {
 		usbip_host_urb_handler(dev);                                                       \
 	}                                                                                          \
                                                                                                    \
-	K_THREAD_STACK_DEFINE(usbip_host_urb_stack_##n, CONFIG_ARCH_POSIX_RECOMMENDED_STACK_SIZE); \
+	K_THREAD_STACK_DEFINE(usbip_host_urb_stack_##n, 4096); \
 	static void usbip_host_start_urb_handler_##n(const struct device *dev)                     \
 	{                                                                                          \
 		struct usbip_host_data *priv = dev->data;                                          \
                                                                                                    \
 		k_thread_create(&priv->urb_thread, usbip_host_urb_stack_##n,                       \
-				CONFIG_ARCH_POSIX_RECOMMENDED_STACK_SIZE,                          \
+				4096,                          \
 				usbip_host_urb_thread_##n, (void *)dev, NULL, NULL,                \
 				K_PRIO_COOP(4), K_ESSENTIAL, K_NO_WAIT);                           \
 		k_thread_name_set(&priv->urb_thread, dev->name);                                   \
@@ -533,13 +559,13 @@ static struct usbip_api usbip_host_api = {
 		usbip_host_rx_handler(dev);                                                        \
 	}                                                                                          \
                                                                                                    \
-	K_THREAD_STACK_DEFINE(usbip_host_rx_stack_##n, CONFIG_ARCH_POSIX_RECOMMENDED_STACK_SIZE);  \
+	K_THREAD_STACK_DEFINE(usbip_host_rx_stack_##n, 4096);  \
 	static void usbip_host_start_rx_handler_##n(const struct device *dev)                      \
 	{                                                                                          \
 		struct usbip_host_data *priv = dev->data;                                          \
                                                                                                    \
 		k_thread_create(&priv->rx_thread, usbip_host_rx_stack_##n,                         \
-				CONFIG_ARCH_POSIX_RECOMMENDED_STACK_SIZE,                          \
+				4096,                          \
 				usbip_host_rx_thread_##n, (void *)dev, NULL, NULL, K_PRIO_COOP(4), \
 				K_ESSENTIAL, K_NO_WAIT);                                           \
 		k_thread_name_set(&priv->rx_thread, dev->name);                                    \
